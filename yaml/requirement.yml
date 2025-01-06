@@ -1,0 +1,69 @@
+Person_Detection:
+  collect:
+    rtm: []
+    apt: []
+    pip:
+    - pygame
+    git:
+    - url: null
+      repo: null
+      branch: null
+    other: []
+Speech_Synthesis:
+  collect:
+    rtm: []
+    apt: []
+    pip:
+    - pygame
+    git:
+    - url: null
+      repo: null
+      branch: null
+    other: []
+Speech_Recognition:
+  collect:
+    rtm: []
+    apt: []
+    pip:
+    - SpeechRecognition
+    - pygame
+    git:
+    - url: null
+      repo: null
+      branch: null
+    other: []
+  collect:
+    rtm: []
+    apt:
+    - ros-noetic-cv-bridge
+    pip:
+    - opencv-python
+    - PyYAML
+    - pygame
+    - face_recognition
+    - psycopg2
+    git:
+    - url: null
+      repo: null
+      branch: null
+    other: []
+  collect:
+    rtm: []
+    apt: []
+    pip:
+    - pygame
+    git:
+    - url: null
+      repo: null
+      branch: null
+    other: []
+  collect:
+    rtm: []
+    apt:
+    - null
+    pip: []
+    git:
+    - url: null
+      repo: null
+      branch: null
+    other: []

@@ -1,0 +1,6 @@
+run:
+  rtm: []
+  rosrun:
+  - torobo_action_test torobo_act.py
+  - rois_ros camerapublish.py
+  roslaunch: []

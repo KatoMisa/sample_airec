@@ -4,7 +4,7 @@ import rospy
 import os
 import subprocess
 import rosparam
-from std_msgs.msg import String
+from std_msgs.msg import String, Int32MultiArray
 import pygame
 import speech_recognition as sr
 from rois_ros.srv import *
@@ -33,7 +33,7 @@ class Speech_RecognitionService():
 
 
         #聞き取り時に使用する音源
-        self.directory="/home/rsdlab/catkin_ws/src/sample_airec/voice_kenkou/"
+        self.directory="/home/rsdlab/catkin_ws/src/rois_ros/script/voice_kenkou/"
         self.start_sound =self.directory +"kaishi.mp3"
         self.stop_sound =self.directory +"shuryo.mp3"
         self.retry_sound = self.directory +"retry.mp3"
@@ -76,6 +76,10 @@ class Speech_RecognitionService():
 
         #コマンド終了の通知用のトピックの設定
         self.pub1 = rospy.Publisher('/completed_event', completed , queue_size=1)
+
+        self.rtm_command_in = rospy.Publisher('/command_in', Int32MultiArray , queue_size=1)
+        self.rtm_command_out = rospy.Subscriber('/command_out', String , self.handle_recognition_result)
+
 
         #イベント通知のトピックを送信するか判断する変数の設定
         self.SEND_STARTTIME = False    #speech_input_startedメソッド用
@@ -173,71 +177,32 @@ class Speech_RecognitionService():
         self.result.success = "True"
         self.server.set_succeeded(self.result)
 
+
         self.recognized_thread = threading.Thread(target=self.recognize)
         self.recognized_thread.start()
 
 
     def stop(self):
         print("stop")
-        # if self.state == "playing":
-        #     self.state = "stopped"
-        #     print("音声認識は停止しました")
-
-        #     self.feedback.status = "playing stopped."
-            
-        #     pub_data = completed()
-        #     pub_data.command_id = "start"
-        #     pub_data.status = "stopped"
-        #     self.pub.publish(pub_data)
-            
-        #     self.result.success = "True"
-        #     self.server.set_succeeded(self.result)
-
-        #     self.comp_state = "READY"
-        #     rospy.loginfo(f'Componemt status: {self.comp_state}') 
-        # else:
-        #     rospy.logwarn("No active playing.")
-        #     self.feedback.status = "No active goal to stop."
-        #     self.result.success = "False"
-        #     self.server.set_aborted(self.result)
 
 
     def suspend(self):
         print("suspend")
-        # if self.state == "playing":
-        #     pygame.mixer.music.pause()
-        #     self.state = "suspended"
-        #     self.feedback.status = "play suspended."
-        #     self.result.success = "True"
-        #     self.server.set_succeeded(self.result)
-        # else:
-        #     rospy.logwarn("Cannot suspend; not playing.")
-        #     self.result.success = "False"
-        #     self.server.set_aborted(self.result)
 
 
     def resume(self):
         print("resume")
-        # if self.state == "suspended":
-        #     pygame.mixer.music.unpause()
-        #     self.state = "playing"
-        #     self.feedback.status = "Playing resumed."
-        #     self.result.success = "True"
-        #     self.server.set_succeeded(self.result)
-
-        #     if not self.recognized_thread or not self.recognized_thread.is_alive():
-        #         self.recognized_thread = threading.Thread(target=self.recognize)
-        #         self.recognized_thread.start()
-        # else:
-        #     rospy.logwarn("No previous goal to resume.")
-        #     self.result.success = "False"
-        #     self.server.set_aborted(self.result)
 
 
 
 
     #認識完了を通知する
     def speech_recognized(self,text):
+        if text == "ERROR":
+            self.comp_state = "ERROR"
+            rospy.loginfo(f'Componemt status: {self.comp_state}') 
+            return
+            
         completed_time= rospy.get_time()
         self.completed_time ='recognized time: '+ str(datetime.fromtimestamp(completed_time))
         print(self.completed_time)
@@ -288,83 +253,37 @@ class Speech_RecognitionService():
 
     #実際に音声認識をする関数
     def recognize(self):
+
+        command_list = Int32MultiArray()
+
+        if self.state == "playing":
+            command_list.data.append(0)
+
+        elif self.state == "stopped":
+            command_list.data.append(1)
+
+        else:
+            command_list.data.append(2)
+
+
+        if self.set_language == "japanese":
+            command_list.data.append(10)
+
+        elif self.set_language == "english":
+            command_list.data.append(11)
+
+        elif self.set_language == "french":
+            command_list.data.append(12)
+
+        print(f"Send command {command_list.data}")
+
+        self.rtm_command_in.publish(command_list)
         
-        # self.Recognizerオブジェクトを作成
-        retry_limit = 2
-        attempts = 0
-        
-        while attempts < retry_limit:
-            if self.state == "stopped":
-                print(self.state)
-                print("音声認識は停止中です。")
-                break
-            try:
-                with sr.Microphone() as source:
-                    print("マイクを調整しています...")
-                    self.recognizer.adjust_for_ambient_noise(source)  # 周囲のノイズを調整
-                    print("話しかけてください...")
-                    
-                    pygame.mixer.init()
-                    pygame.mixer.music.load(self.start_sound)
-                    
-                    #認識を開始した時間を通知するメソッド
-                    self.speech_input_started()
-                    pygame.mixer.music.play()
+        return
 
-                    audio = self.recognizer.listen(source,phrase_time_limit=5)  # 音声をキャプチャ
-
-                    pygame.mixer.init()
-                    pygame.mixer.music.load(self.stop_sound)
-                    pygame.mixer.music.play()
-                
-                rospy.sleep(0.5)
-                #認識が終わった時間を通知するメソッド
-                self.speech_input_finished()    
-                
-                text = '>> 音声認識しています...'
-                print('\r' + '　' * 40 + '\r', end='', flush=True)
-                print(text)
-                self.recognized_text = self.recognizer.recognize_google(audio, language=self.languages)  # 日本語認識
-                # self.recognized_text = self.recognizer.recognize_google(audio, language="ja-JP")  # 日本語認識
-                
-                
-                print(f"認識された内容: {self.recognized_text}")
-                self.speech_recognized(self.recognized_text)
-
-                #完了したら呼び出す関数
-                # self.on_recognize_complete()
-
-                # 認識に成功したら、テキストを返して終了
-                return 
-
-            except sr.UnknownValueError:
-                text = "上手く聞き取れませんでした．もう一度お願いします"
-                print('\r' + '　' * 40 + '\r', end='', flush=True)
-            
-            except sr.RequestError as e:
-                text = "結果をリクエストできませんでした.\n"
-                print('\b' * 20, end='', flush=True)
-                print('　' * 20 + '\n', end='', flush=True)
-                print(f"結果をリクエストできませんでした．; {e}")
-                self.comp_state = "READY"
-                rospy.loginfo(f'Componemt status: {self.comp_state}')
-
-            except Exception as e:
-                print(f"予期しないエラーが発生しました: {e}")
-                self.comp_state = "ERROR"
-                rospy.loginfo(f'Componemt status: {self.comp_state}')
-                result = "error"
-                return result
-
-            attempts += 1
-            print(f"再試行回数: {attempts}/{retry_limit}")
-
-        if self.state != "stopped":
-            print("リトライの上限に達しました。認識に失敗しました。")
-
-        self.speech_recognized(self.recognized_text)
-        # リトライ上限に達した場合は None を返す
-        return None  
+    def handle_recognition_result(self, msg):
+        rospy.loginfo(f"Recognition result received: {msg.data}")
+        self.speech_recognized(msg.data)
 
     # #完了したら呼び出される関数
     # def on_recognize_complete(self):
@@ -394,7 +313,7 @@ class Speech_RecognitionService():
 
 
 if __name__ == "__main__":
-    rospy.init_node('speech_recognition')
+    rospy.init_node('Speech_Recognition')
     print("time")
     service = Speech_RecognitionService()
     service.run()

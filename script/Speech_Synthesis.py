@@ -4,11 +4,11 @@
 import os
 import actionlib
 import rospy
-from std_msgs.msg import String
-from pygame import mixer
+from std_msgs.msg import String,Int32MultiArray
+from pygame import mixer      
+import pygame
 import rospy
 import threading
-from modules.srv import *
 from rois_ros.msg import *
 from rois_ros.srv import *
 
@@ -28,9 +28,10 @@ class Speech_SynthesisService:
         self.state_service = rospy.Service(state_name, component_status, self.component_status)   #
         rospy.loginfo("component status server is ready")  
 
-        self.directory="/home/rsdlab/catkin_ws/src/sample_airec/voice_kenkou/"
+        self.directory="/home/rsdlab/catkin_ws/src/rois_ros/script/voice_kenkou/"
         self.text ="hello"
         self._words =self.directory +"hello.mp3"
+        self.word_num = 10
             
 
         exe_name = '/execute/' + self.comp_ref
@@ -45,7 +46,8 @@ class Speech_SynthesisService:
         self.pub = rospy.Publisher('/completed_command', completed , queue_size=1)
         # self.pub = rospy.Publisher('/completed', String,queue_size=1)
 
-
+        self.rtm_command_in = rospy.Publisher('/speech_in', Int32MultiArray , queue_size=1)
+        self.rtm_command_out = rospy.Subscriber('/speech_out', String , self.handle_speech_result)
 
         self.state = "idle"
         #self.goal_sent = False
@@ -63,60 +65,69 @@ class Speech_SynthesisService:
         
         self.text = s_req.speech_text
         
+        
         if self.text == "hello":#おはようございます
             self._words = self.directory + "hello.mp3"
+            self.word_num = 10
 
         elif self.text == "measure1": #~さん今から計ります
             self._words = self.directory + "check_measure.mp3"
+            self.word_num = 11
+
+        elif self.text == "measure2": #~さん今から計ります
+            self._words = self.directory + "check_measure2.mp3"
+            self.word_num = 12
+        
+        elif self.text == "measure3": #福田くん
+            self._words = self.directory + "check_measure3.mp3"
+            self.word_num = 13
 
         elif self.text == "yorosiku": #よろしく（腕をおいてください）
             self._words = self.directory + "yorosiku.mp3"
+            self.word_num = 14
 
         elif self.text == "check": #体調をチェックしますね、そのままお待ちください
             self._words = self.directory + "check_start.mp3"
+            self.word_num = 15
 
         elif self.text == "ask1": #体調はどうですか？
             self._words = self.directory + "how_health.mp3"
+            self.word_num = 16
 
         elif self.text == "bad_high": #体調悪andリスク高
             self._words = self.directory + "bad_high.mp3"
-
+            self.word_num = 17
+       
+        elif self.text == "bad_low": #体調悪い&リスク低
+            self._words = self.directory + "bad_low.mp3"
+            self.word_num = 18
+ 
+        elif self.text == "good_low": #体調良い&リスク低
+            self._words = self.directory + "good_low.mp3"
+            self.word_num = 19
+        
+        elif self.text == "good_high": #体調良いandリスク高
+            self._words = self.directory + "good_high.mp3"
+            self.word_num = 20
+        
         elif self.text == "hand": #手を握りましたか
             self._words = self.directory + "check_hand.mp3"
+            self.word_num = 21
 
         elif self.text == "thank": #計測が終わりました、ありがとう
             self._words = self.directory + "check_ok.mp3"
+            self.word_num = 22
 
 
         elif self.text == "ask2": #体調はどうですか？
             self._words = self.directory + "how_health.mp3"
+            self.word_num = 23
+
+        elif self.text == "voice":
+            self.word_num = 50
 
 
 
-        # elif self.text == "check": #体調をチェックしますね
-        #     self._words = self.directory + "check_start.mp3"
-
-        # elif self.text == "move_start": #今から移動を開始します
-        #     self._words = self.directory + "move_start.mp3"
-
-
-
-        # elif self.text == "Squeeze finger": #指を握ってください
-        #     self._words = self.directory + "hand_finger.mp3"
-
-        # elif self.text == "put arm": #腕をおいてください
-        #     self._words = self.directory + "put_arm.mp3"
-
-        # elif self.text == "ask": #体調はどうですか？
-        #     self._words = self.directory + "how_health.mp3"
-
-        # elif self.text == "bad_high": #体調悪andリスク高
-        #     self._words = self.directory + "bad_high.mp3"
-
-
-
-        # elif self.text == "long test":
-        #     self._words = self.directory + "longtest1.mp3"
 
         else:
             self._words = "no"
@@ -199,49 +210,75 @@ class Speech_SynthesisService:
     def monitor_playback(self):
         rospy.loginfo("Monitoring playback.")
 
-        try:
-            pygame.mixer.init()
-            pygame.mixer.music.load(self._words)
-            pygame.mixer.music.play()
+        command_list = Int32MultiArray()
+
+        if self.state == "playing":
+            command_list.data.append(0)
+
+        elif self.state == "stopped":
+            command_list.data.append(1)
+
+        else:
+            command_list.data.append(2)
+
+        command_list.data.append(self.word_num)
 
 
-            while self.state == "playing":
-                rospy.sleep(0.1)
+        print(f"Send command {command_list.data}")
 
-                if not pygame.mixer.music.get_busy():
-                    rospy.loginfo("Playback completed.")
-                    self.state = "OK"
-                    # self.completed_command()
-                    return
-
-        except pygame.error as e:
-            print(f"Pygame error occurred: {e}")
-            self.state = "ERROR"
-
-            self.comp_state = "ERROR"
-            rospy.loginfo(f'Componemt status: {self.comp_state}') 
-        except FileNotFoundError as e:
-            print(f"File error: {e}")
-            self.state = "ERROR"
-
-            self.comp_state = "ERROR"
-            rospy.loginfo(f'Componemt status: {self.comp_state}') 
-        except Exception as e:
-            print(f"Unexpected error: {e}")
-            self.state = "ERROR"
-            self.comp_state = "ERROR"
-            rospy.loginfo(f'Componemt status: {self.comp_state}') 
+        self.rtm_command_in.publish(command_list)
         
-        finally:
-            self.completed_command()
+        return
+        
+
+    def handle_speech_result(self, msg):
+        rospy.loginfo(f"Recognition result received: {msg.data}")
+        self.completed_command(msg.data)
+
+
+        # try:
+        #     pygame.mixer.init()
+        #     pygame.mixer.music.load(self._words)
+        #     pygame.mixer.music.play()
+
+
+        #     while self.state == "playing":
+        #         rospy.sleep(0.1)
+
+        #         if not pygame.mixer.music.get_busy():
+        #             rospy.loginfo("Playback completed.")
+        #             self.state = "OK"
+        #             # self.completed_command()
+        #             return
+
+        # except pygame.error as e:
+        #     print(f"Pygame error occurred: {e}")
+        #     self.state = "ERROR"
+
+        #     self.comp_state = "ERROR"
+        #     rospy.loginfo(f'Componemt status: {self.comp_state}') 
+        # except FileNotFoundError as e:
+        #     print(f"File error: {e}")
+        #     self.state = "ERROR"
+
+        #     self.comp_state = "ERROR"
+        #     rospy.loginfo(f'Componemt status: {self.comp_state}') 
+        # except Exception as e:
+        #     print(f"Unexpected error: {e}")
+        #     self.state = "ERROR"
+        #     self.comp_state = "ERROR"
+        #     rospy.loginfo(f'Componemt status: {self.comp_state}') 
+        
+        # finally:
+        #     self.completed_command()
 
 
     # 再生が終了したらこのメソッドが呼ばれる
-    def completed_command(self):
+    def completed_command(self, state):
         rospy.loginfo("Playback completed successfully.")
         pub_data = completed()
         pub_data.command_id = "Speech_Synthesis"
-        pub_data.status = self.state
+        pub_data.status = state
         print(f"{pub_data.command_id}:{pub_data.status}")
         self.pub.publish(pub_data)
         

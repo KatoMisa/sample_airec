@@ -1,0 +1,13 @@
+<rois:HRIEngineProfile xmlns:rois="http://example.com/rois" xmlns:gml="http://example.com/gml">
+    <gml:identifier>urn:x-rois:def:HRIEngine:ATR::Mainengine</gml:identifier>
+    <gml:name>Mainengine</gml:name>
+    <rois:HRIComponent>rois:HRIComponent:PersonDetection</rois:HRIComponent>
+    <rois:HRIComponent>rois:HRIComponent:Speech_Synthesis</rois:HRIComponent>
+    <rois:HRIComponent>rois:HRIComponent:Speech_Recognition</rois:HRIComponent>
+    <rois:HRIComponent>rois:HRIComponent:PersonIdentification</rois:HRIComponent>
+    <rois:HRIComponent>rois:HRIComponent:PersonLocalzation</rois:HRIComponent>
+    <rois:HRIComponent>rois:HRIComponent:Move</rois:HRIComponent>
+    <rois:HRIComponent>rois:HRIComponent:Approach</rois:HRIComponent>
+    <rois:HRIComponent>rois:HRIComponent:Touch</rois:HRIComponent>
+    <rois:HRIComponent>rois:HRIComponent:Leave</rois:HRIComponent>
+</rois:HRIEngineProfile>
