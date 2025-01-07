@@ -1,6 +1,6 @@
 <rois:HRIEngineProfile xmlns:rois="http://example.com/rois" xmlns:gml="http://example.com/gml">
-    <gml:identifier>urn:x-rois:def:HRIEngine:ATR::Mainengine</gml:identifier>
-    <gml:name>Mainengine</gml:name>
+    <gml:identifier>urn:x-rois:def:HRIEngine:sample_airec</gml:identifier>
+    <gml:filename>Mainengine</gml:filename>
     <rois:HRIComponent>rois:HRIComponent:PersonDetection</rois:HRIComponent>
     <rois:HRIComponent>rois:HRIComponent:Speech_Synthesis</rois:HRIComponent>
     <rois:HRIComponent>rois:HRIComponent:Speech_Recognition</rois:HRIComponent>
