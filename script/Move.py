@@ -196,8 +196,8 @@ class MoveService:
             linear_y = self.Kp * error_y + self.Ki * self.error_sum_y
 
             # 安全のため速度制限（-0.5 ~ 0.5 m/s）
-            linear_x = max(min(linear_x, 0.2), -0.2)
-            linear_y = max(min(linear_y, 0.2), -0.2)
+            linear_x = max(min(linear_x, 0.3), -0.3)
+            linear_y = max(min(linear_y, 0.3), -0.3)
 
             # 目標位置を超えないように制御
             if self.current_x + linear_x * 0.1 > (self.start_x + self.relative_target_x):
