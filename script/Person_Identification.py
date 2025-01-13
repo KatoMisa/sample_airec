@@ -24,15 +24,20 @@ import cv2
 #int64 time_to_run
 
 # PostgreSQL接続情報
+home_path = os.environ['HOME']
+db_file_path = home_path + '/database.yml'
+with open(db_file_path, 'r') as file:
+    db = yaml.safe_load(file)
+    
 db_config = {
     'host': 'localhost',
-    'dbname': 'kobetest',
-    'user': 'rsdlab',
-    'password': 'rsdlab',
+    'dbname': db['dbname'],
+    'user': db['user'],
+    'password': db['password'],
 }
 
-directry = "/home/rsdlab/catkin_ws/src/rois_ros/script/voice_kenkou/identification.mp3"
-file_path = '/home/rsdlab/catkin_ws/src/rois_ros/script/person_id.yml'
+directry = home_path +"/catkin_ws/src/rois_ros/script/voice_kenkou/identification.mp3"
+file_path = home_path + '/catkin_ws/src/rois_ros/script/person_id.yml'
 
 
 class Person_IdentificationService:
@@ -55,16 +60,16 @@ class Person_IdentificationService:
         self.known_face_encodings = []
         self.known_face_names = []
         self.known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file("/home/rsdlab/catkin_ws/src/rois_ros/script/images/manato.jpg"))[0])
-        self.known_face_names.append("Manato Fukuta")
+        self.known_face_names.append("Person A")
         #self.known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file("/home/rsdlab/catkin_ws/src/rois_ros/script/images/karina.jpg"))[0])
         #self.known_face_names.append("Karina")
         self.known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file("/home/rsdlab/catkin_ws/src/rois_ros/script/images/ohara.jpg"))[0])
-        self.known_face_names.append("Kenichi Ohara")
+        self.known_face_names.append("Person B")
         self.known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file("/home/rsdlab/catkin_ws/src/rois_ros/script/images/fukuda.jpg"))[0])
-        self.known_face_names.append("Toshio Fukuda")
+        self.known_face_names.append("Person C")
 
         self.known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file("/home/rsdlab/catkin_ws/src/rois_ros/script/images/misa.jpg"))[0])
-        self.known_face_names.append("Misa Kato")
+        self.known_face_names.append("Person D")
         ##
 
         #Command用のアクション通信の設定(!!!)
