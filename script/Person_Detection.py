@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import rospy
 import os
+import yaml
 import subprocess
 import rosparam
 from std_msgs.msg import String,Bool
@@ -27,27 +28,29 @@ class Person_DetectionService():
         #コンポーネント名を設定する
         self.comp_ref = "Person_Detection"
 
+        self.robotname =  '/'+ self.get_robotfile()["Robot"]
+        print(f"Robot name: {self.robotname}")
+
         #コンポーネントの状態確認のサービス設定
-        state_name = '/get_state/' + self.comp_ref
+        state_name = self.robotname + '/get_state/' + self.comp_ref
         self.state_service = rospy.Service(state_name, component_status, self.component_status)
 
 
 
         #Command用のアクション通信の設定
-        exe_name = '/execute/' + self.comp_ref
+        exe_name = self.robotname + '/execute/' + self.comp_ref
         self.server = actionlib.SimpleActionServer(exe_name, executeAction, self.execute, False)
         self.server.start()
         rospy.loginfo(f"{exe_name} Service is ready.")
-        
-        #Event用のサービス通信の設定
-        exe_name = '/Subscribe/' + self.comp_ref
-        self.sub_server = rospy.Service(exe_name, subscribe_set, self.subs)
-        rospy.loginfo(f"{exe_name} Service is ready.")
+
 
         # #パラメータ操作用のサービス通信の設定
         self.detect_human = rospy.ServiceProxy('/detection', detection)  
+        rospy.wait_for_service( '/detection')
         self.detect_human1 = rospy.ServiceProxy('/start', JudgeParam)  
+        rospy.wait_for_service( '/start')
         self.detect_human2 = rospy.ServiceProxy('/stop', JudgeParam)  
+        rospy.wait_for_service( '/stop')
 
         #Thread用の設定
         self.state = "idle"
@@ -57,7 +60,7 @@ class Person_DetectionService():
 
 
         #イベント通知するためのトピック通信の設定
-        self.pub = rospy.Publisher('/event_persondetec', notify_persondetect , queue_size=1)
+        self.pub = rospy.Publisher(self.robotname + '/event_persondetec', notify_persondetect , queue_size=1)
 
         #コマンド終了の通知用のトピックの設定
         self.pub1 = rospy.Publisher('/completed_event', completed , queue_size=1)
@@ -71,7 +74,20 @@ class Person_DetectionService():
         rospy.loginfo(f'Componemt status: {self.comp_state}')  #コンポーネントをREADY状態にする
 
 
+    def get_robotfile(self):
+        # 現在のスクリプトの絶対パスを取得
+        current_file_path = os.path.abspath(__file__)
 
+        package_relative_path = current_file_path.split('/src/')[1]
+        catkin_path = current_file_path.split('/src/')[0]
+        package_name = package_relative_path.split('/')[0]
+
+        path = catkin_path +'/src/'+ package_name +"/robot.yaml"
+        
+        with open(path, 'r') as file:
+            data = yaml.safe_load(file)
+
+        return data
 
     #コンポーネントが持つパラメータを設定するためのset_parameter()
     def set_parameter(self, s_req):
@@ -181,21 +197,6 @@ class Person_DetectionService():
         #     self.server.set_aborted(self.result)
 
 
-    def subs(self, goal):
-        self.event = goal.event_type
-        
-        #イベントメソッド名を指定
-        if self.event == "person_detected":
-            #トピックを送信するように設定
-            self.SEND_TEXT = True
-            #返答
-            return subscribe_setResponse("True")
-
-        #該当するイベントメソッド名がない場合
-        else:
-            rospy.loginfo("No valid command received.")
-            return subscribe_setResponse("False")
-
     def decb(self,msg):
         if not msg.data:
             print("return")
@@ -286,6 +287,5 @@ class Person_DetectionService():
 
 if __name__ == "__main__":
     rospy.init_node('Person_Detection')
-    print("time")
     service = Person_DetectionService()
     service.run()

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import yaml
 import actionlib
 import rospy
 from std_msgs.msg import String,Int32MultiArray
@@ -12,10 +13,6 @@ import threading
 from rois_ros.msg import *
 from rois_ros.srv import *
 
-#発話用(クラス追加)
-
-OHAYO = "おはようございます"
-MOVE = "今から移動を開始します。"
 
 class Speech_SynthesisService:
     def __init__(self):
@@ -24,7 +21,10 @@ class Speech_SynthesisService:
 
         self.comp_ref = "Speech_Synthesis"
 
-        state_name = '/get_state/' + self.comp_ref
+        self.robotname =  '/'+ self.get_robotfile()["Robot"]
+        print(f"Robot name: {self.robotname}")
+
+        state_name = self.robotname + '/get_state/' + self.comp_ref
         self.state_service = rospy.Service(state_name, component_status, self.component_status)   #
         rospy.loginfo("component status server is ready")  
 
@@ -34,16 +34,16 @@ class Speech_SynthesisService:
         self.word_num = 10
             
 
-        exe_name = '/execute/' + self.comp_ref
+        exe_name = self.robotname +  '/execute/' + self.comp_ref
         self.server = actionlib.SimpleActionServer(exe_name, executeAction, self.execute, False)
         print(exe_name)
         self.server.start()     
 
-        self.set = rospy.Service('/speech_set_param', speech_set_param, self.set_parameter)  
-        self.get = rospy.Service('/speech_get_param', speech_get_param, self.get_parameter)
+        self.set = rospy.Service(self.robotname + '/speech_set_param', speech_set_param, self.set_parameter)  
+        self.get = rospy.Service(self.robotname + '/speech_get_param', speech_get_param, self.get_parameter)
 
 
-        self.pub = rospy.Publisher('/completed_command', completed , queue_size=1)
+        self.pub = rospy.Publisher(self.robotname + '/completed_command', completed , queue_size=1)
         # self.pub = rospy.Publisher('/completed', String,queue_size=1)
 
         self.rtm_command_in = rospy.Publisher('/speech_in', Int32MultiArray , queue_size=1)
@@ -58,6 +58,23 @@ class Speech_SynthesisService:
 
 
         self.playback_thread = None 
+
+
+
+    def get_robotfile(self):
+        # 現在のスクリプトの絶対パスを取得
+        current_file_path = os.path.abspath(__file__)
+
+        package_relative_path = current_file_path.split('/src/')[1]
+        catkin_path = current_file_path.split('/src/')[0]
+        package_name = package_relative_path.split('/')[0]
+
+        path = catkin_path +'/src/'+ package_name +"/robot.yaml"
+        
+        with open(path, 'r') as file:
+            data = yaml.safe_load(file)
+
+        return data
 
 
     def set_parameter(self, s_req):
@@ -358,7 +375,6 @@ class Speech_SynthesisService:
 
 if __name__ == "__main__":
     rospy.init_node('Speech_Synthesis')
-    print("time")
     service = Speech_SynthesisService()
     service.run()
 

@@ -24,11 +24,13 @@ import cv2
 #int64 time_to_run
 
 # PostgreSQL接続情報
+
 home_path = os.environ['HOME']
 db_file_path = home_path + '/database.yml'
 with open(db_file_path, 'r') as file:
     db = yaml.safe_load(file)
-    
+
+
 db_config = {
     'host': 'localhost',
     'dbname': db['dbname'],
@@ -36,9 +38,10 @@ db_config = {
     'password': db['password'],
 }
 
+
+
 directry = home_path +"/catkin_ws/src/rois_ros/script/voice_kenkou/identification.mp3"
 file_path = home_path + '/catkin_ws/src/rois_ros/script/person_id.yml'
-
 
 class Person_IdentificationService:
     def __init__(self):
@@ -48,8 +51,12 @@ class Person_IdentificationService:
         #コンポーネント名を設定する
         self.comp_ref = "Person_Identification"
         print(self.comp_ref)
+
+        self.robotname =  '/'+ self.get_robotfile()["Robot"]
+        print(f"Robot name: {self.robotname}")
+
          #コンポーネントの状態確認のサービス設定
-        state_name = '/get_state/'+self.comp_ref
+        state_name = self.robotname + '/get_state/'+self.comp_ref
         self.comp_state_service = rospy.Service(state_name, component_status, self.component_status)  
 
         ##identify関係init##
@@ -60,30 +67,24 @@ class Person_IdentificationService:
         self.known_face_encodings = []
         self.known_face_names = []
         self.known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file("/home/rsdlab/catkin_ws/src/rois_ros/script/images/manato.jpg"))[0])
-        self.known_face_names.append("Person A")
+        self.known_face_names.append("Manato Fukuta")
         #self.known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file("/home/rsdlab/catkin_ws/src/rois_ros/script/images/karina.jpg"))[0])
         #self.known_face_names.append("Karina")
         self.known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file("/home/rsdlab/catkin_ws/src/rois_ros/script/images/ohara.jpg"))[0])
-        self.known_face_names.append("Person B")
+        self.known_face_names.append("Kenichi Ohara")
         self.known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file("/home/rsdlab/catkin_ws/src/rois_ros/script/images/fukuda.jpg"))[0])
-        self.known_face_names.append("Person C")
+        self.known_face_names.append("Toshio Fukuda")
 
-        self.known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file("/home/rsdlab/catkin_ws/src/rois_ros/script/images/misa.jpg"))[0])
-        self.known_face_names.append("Person D")
         ##
 
         #Command用のアクション通信の設定(!!!)
-        exe_name = '/execute/' + self.comp_ref
+        exe_name =self.robotname + '/execute/' + self.comp_ref
         self.server = actionlib.SimpleActionServer(exe_name, executeAction, self.execute, False)
         self.server.start()
         rospy.loginfo(f"{exe_name} Service is ready.")
 
-        #Event用のサービス通信の設定(!!!)
-        exe_name = '/Subscribe/' + self.comp_ref
-        self.sub_server = rospy.Service(exe_name, subscribe_set, self.subs)
-        rospy.loginfo(f"{exe_name} Service is ready.")
 
-        self.pub = rospy.Publisher('/event_identified', notify_identified , queue_size=1)
+        self.pub = rospy.Publisher(self.robotname + '/event_identified', notify_identified , queue_size=1)
 
         # self.set = rospy.Service('/test_set_param', test_set_param, self.set_parameter)  
         # self.get = rospy.Service('/test_get_param', test_get_param, self.get_parameter)
@@ -106,24 +107,21 @@ class Person_IdentificationService:
         self.SEND_TEXT = False         #speech_recognizedメソッド用
         self.playback_thread = None 
 
+    def get_robotfile(self):
+        # 現在のスクリプトの絶対パスを取得
+        current_file_path = os.path.abspath(__file__)
 
-    #コールバック関数の関数(!!!)
-    def subs(self, goal):
-        self.event = goal.event_type
+        package_relative_path = current_file_path.split('/src/')[1]
+        catkin_path = current_file_path.split('/src/')[0]
+        package_name = package_relative_path.split('/')[0]
+
+        path = catkin_path +'/src/'+ package_name +"/robot.yaml"
         
-        #イベントメソッド名を指定(!!!)
-        if self.event == "person_identified":
-            #トピックを送信するように設定
-            self.SEND_TEXT = True
+        with open(path, 'r') as file:
+            data = yaml.safe_load(file)
 
-            #返答
-            return subscribe_setResponse("True")
-
-
-        else:
-            rospy.loginfo("No valid command received.")
-
-            return subscribe_setResponse("False")
+        return data
+        
 
     def set_parameter(self, s_req):
         print("set parameter")

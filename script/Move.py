@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import rospy
+import os
+import yaml
 import math
 import threading
 import tf
@@ -21,32 +23,33 @@ class MoveService:
 
         self.comp_ref = "Move"
 
-        state_name = '/get_state/' + self.comp_ref
+        self.robotname =  '/'+ self.get_robotfile()["Robot"]
+        print(f"Robot name: {self.robotname}")
+
+        state_name = self.robotname + '/get_state/' + self.comp_ref
         self.state_service = rospy.Service(state_name, component_status, self.component_status)
 
         #アクションサーバーの立ち上げ
-        exe_name = '/execute/' + self.comp_ref
+        exe_name =self.robotname + '/execute/' + self.comp_ref
         self.server = actionlib.SimpleActionServer(exe_name, executeAction, self.execute, False)
         self.server.start()
 
         #コンポーネント側のset_parameter,get_parameterのサービスサーバー
-        self.set = rospy.Service('/move_set_param', move_set_param, self.set_parameter) 
-        self.get = rospy.Service('/move_get_param', move_get_param, self.get_parameter) 
+        self.set = rospy.Service(self.robotname + '/move_set_param', move_set_param, self.set_parameter) 
+        self.get = rospy.Service(self.robotname + '/move_get_param', move_get_param, self.get_parameter) 
 
         self.status = "idle"
         self.current_goal = None
         
         #動作が完了したときに送信するトピック
-        self.comp_pub = rospy.Publisher('/completed_command', completed , queue_size=1)
+        self.comp_pub = rospy.Publisher(self.robotname + '/completed_command', completed , queue_size=1)
 
         self.pub = rospy.Publisher('/torobo/base_controller/cmd_vel', Twist, queue_size=10)
         rospy.Subscriber('/torobo/base_controller/odom', Odometry, self.odom_callback)
 
-        # self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-        # rospy.Subscriber('/odom', Odometry, self.odom_callback)
         
         
-        # 移動の目標相対座標（オフセット）
+        # 移動の目標相対座標
         self.relative_target_x = 0.30  # x方向の相対移動距離
         self.relative_target_y = 0   # y方向の相対移動距離
         self.relative_target_yaw = 0
@@ -74,7 +77,23 @@ class MoveService:
         self.comp_state = "READY"
         rospy.loginfo(f'Componemt status: {self.comp_state}')
 
-        rospy.loginfo("Move Control Action Server is ready.")
+        rospy.loginfo("Move  is ready.")
+
+
+    def get_robotfile(self):
+        # 現在のスクリプトの絶対パスを取得
+        current_file_path = os.path.abspath(__file__)
+
+        package_relative_path = current_file_path.split('/src/')[1]
+        catkin_path = current_file_path.split('/src/')[0]
+        package_name = package_relative_path.split('/')[0]
+
+        path = catkin_path +'/src/'+ package_name +"/robot.yaml"
+        
+        with open(path, 'r') as file:
+            data = yaml.safe_load(file)
+
+        return data
 
 
     #Engineからのパラメータ取得に応じる

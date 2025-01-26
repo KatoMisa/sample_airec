@@ -16,16 +16,38 @@ from rois_ros.msg import *
 
 class ROIS_METHOD:
   def __init__(self):
-    self.connect = rospy.ServiceProxy('/connect', system_interface)
-    rospy.wait_for_service('/connect')
-    self.disconnect = rospy.ServiceProxy('/disconnect', system_interface)
-    rospy.wait_for_service('/bind_any')
-    self.bind = rospy.ServiceProxy('/bind_any', bind_any)
-    self.release = rospy.ServiceProxy('/release', release)
-    self.subscribe = rospy.ServiceProxy('/subscribe', subscribe_)
-    self.service_client = rospy.ServiceProxy('/execute', execute)
+    
+    self.robotname = self.get_robotname()
+    print(self.robotname)
+    
+    self.connect = rospy.ServiceProxy( '/connect', system_interface)
+    rospy.wait_for_service( '/connect')
+    self.disconnect = rospy.ServiceProxy( '/disconnect', system_interface)
+    rospy.wait_for_service( '/bind_any')
+    self.bind = rospy.ServiceProxy( '/bind_any', bind_any)
+    self.release = rospy.ServiceProxy( '/release', release)
+    self.subscribe = rospy.ServiceProxy( '/subscribe', subscribe_)
+    self.service_client = rospy.ServiceProxy( '/execute', execute)
     self.arm = rospy.ServiceProxy("/robot_action",RobotAction)
 
+  def get_robotname(self):
+    # 現在のスクリプトの絶対パスを取得
+    current_file_path = os.path.abspath(__file__)
+    package_relative_path = current_file_path.split('/src/')[1]
+    package_relative_path_ = current_file_path.split('/src/')[0]
+    # print(f"{package_relative_path}")
+    # 最初のディレクトリがパッケージ名
+    package_name = package_relative_path.split('/')[0]
+
+    print(f"This node belongs to package: {package_name}")
+    path = package_relative_path_ +'/src/'+ package_name +"/robot.yaml"
+        
+    with open(path, 'r') as file:
+      data = yaml.safe_load(file)
+       
+    robotname = '/'+ data["Robot"]
+
+    return robotname
 
   def test_execute(self,component_ref):
     self.component_ref = component_ref
@@ -65,11 +87,11 @@ class ROIS_METHOD:
 
   def get_parameter(self, component_ref):
     if component_ref == "Move":
-      get_name = '/get_parameter/' + component_ref  
+      get_name =  '/get_parameter/' + component_ref  
       get_param = rospy.ServiceProxy(get_name, move_get_parameter)
 
     elif component_ref == "Speech_Synthesis":
-      get_name = '/get_parameter/' + component_ref 
+      get_name =  '/get_parameter/' + component_ref 
       get_param = rospy.ServiceProxy(get_name, speech_get_parameter)
       
       
@@ -78,14 +100,14 @@ class ROIS_METHOD:
 
   def set_parameter(self, component_ref, parameters):
     if component_ref == "Move":
-      set_name = '/set_parameter/' + component_ref
+      set_name =  '/set_parameter/' + component_ref
       set_param = rospy.ServiceProxy(set_name, move_set_parameter)
 
       result = set_param(component_ref,parameters)
 
 
     elif component_ref == "Speech_Synthesis":
-      set_name = '/set_parameter/' + component_ref
+      set_name =  '/set_parameter/' + component_ref
       set_param = rospy.ServiceProxy(set_name, speech_set_parameter1)
       result = set_param(component_ref, parameters)
       
@@ -108,14 +130,14 @@ class ROIS_METHOD:
 
   def monitor_progress(self):
     rospy.loginfo("待機中...")
-    result = rospy.wait_for_message('/completed', completed)
+    result = rospy.wait_for_message( '/completed', completed)
     rospy.loginfo(f"Received message: {result.command_id}", )
     rospy.loginfo(f"Received message: {result.status}", )
 
 
   def monitor_event(self):
     rospy.loginfo("待機中...")
-    result = rospy.wait_for_message('/notify_event', notifyevent)
+    result = rospy.wait_for_message( '/notify_event', notifyevent)
     rospy.loginfo(f"Received message: {result.event_id}", )
     rospy.loginfo(f"Received message: {result.event_type}", )
     rospy.loginfo(f"Received message: {result.subscribe_id}", )
@@ -124,13 +146,13 @@ class ROIS_METHOD:
 
 
   def subscribe(self, event_type):
-    subservice = rospy.ServiceProxy('/Subscribe', subscribe_)
+    subservice = rospy.ServiceProxy( '/Subscribe', subscribe_)
     result = subservice(event_type)
 
     return result
 
   def unsubscribe(self, subscribe_id):
-    unsubservice = rospy.ServiceProxy('/Unsubscribe', unsubscribe_)
+    unsubservice = rospy.ServiceProxy( '/Unsubscribe', unsubscribe_)
     result = unsubservice(subscribe_id)
 
     return result
@@ -138,7 +160,7 @@ class ROIS_METHOD:
 
 
   def get_command_result(self, command_id):
-    command_result = rospy.ServiceProxy('/get_command_result', get_command_result)
+    command_result = rospy.ServiceProxy( '/get_command_result', get_command_result)
     result = command_result(command_id, "")
     return result
 
@@ -146,16 +168,16 @@ class ROIS_METHOD:
   def get_event_detail(self, event_id):
     print(event_id)
     if "recog" in  event_id:
-      event_result = rospy.ServiceProxy('/recognized_event_detail', get_event_detail_speech_recognized)
+      event_result = rospy.ServiceProxy( '/recognized_event_detail', get_event_detail_speech_recognized)
 
     elif "detected" in event_id:
-      event_result = rospy.ServiceProxy('/detected_event_detail', get_event_detail_person_detected)
+      event_result = rospy.ServiceProxy( '/detected_event_detail', get_event_detail_person_detected)
 
     elif "local" in event_id:
-      event_result = rospy.ServiceProxy('/local_event_detail', get_event_detail_person_localized)
+      event_result = rospy.ServiceProxy( '/local_event_detail', get_event_detail_person_localized)
 
     elif "ident" in event_id:
-      event_result = rospy.ServiceProxy('/identified_event_detail', get_event_detail_person_identified)
+      event_result = rospy.ServiceProxy( '/identified_event_detail', get_event_detail_person_identified)
 
     result = event_result(event_id)
     return result
@@ -173,8 +195,9 @@ def add_item(_list, item):
     return False
 
 
-def speech(component_ref, speech_text):
-
+def speech(speech_text):
+    component_ref = "Speech_Synthesis"
+    print(component_ref)
     rois.bind_any(component_ref)
 
     rois.set_parameter(component_ref, speech_text)
@@ -189,11 +212,11 @@ def speech_bind(component_ref):
   rois.bind_any(component_ref)
   rois.release(component_ref)
 
-def recognize_response(component_ref,languages):
+def recognize_response(languages):
+    component_ref = "Speech_Recognition"
     event_id = "speech_recognized"
     rois.bind_any(component_ref)
     rois.subscribe(event_id)
-    # rois.set_parameter(component_ref, line)
     rois.execute("start")
     result = rois.monitor_event()
 
@@ -203,7 +226,9 @@ def recognize_response(component_ref,languages):
     return event_result.recognized_text
 
 
-def patient_identify(component_ref):
+def patient_identify():
+    component_ref = "Person_Identification"
+    print(component_ref)
     event_id = "person_identified"
     rois.bind_any(component_ref)
     rois.subscribe(event_id)
@@ -215,8 +240,9 @@ def patient_identify(component_ref):
     return event_result.person_ref[0]
 
 
-
-def person_detect(component_ref):
+def person_detect():
+    component_ref = "Person_Detection"
+    print(component_ref)
     event_id = "person_detected"
     rois.bind_any(component_ref)
     rois.subscribe(event_id)
@@ -227,7 +253,9 @@ def person_detect(component_ref):
     rois.release(component_ref)    
     return event_result.number
 
-def person_localize(component_ref):
+def person_localize():
+    component_ref = "Person_Localization"
+    print(component_ref)
     event_id = "person_localized"
     rois.bind_any(component_ref)
     rois.subscribe(event_id)
@@ -239,10 +267,12 @@ def person_localize(component_ref):
     return event_result
 
 
-def move_forward(component_ref,line):
+
+def move_forward(line):
+    component_ref = "Move"
     rois.bind_any(component_ref)
 
-    # rois.set_parameter(component_ref, line)
+    rois.set_parameter(component_ref, line)
     rois.execute("start")
     result = rois.monitor_progress()
     rois.release(component_ref)
@@ -258,7 +288,9 @@ def judgement(input_response):
   return judge.response_text
 
 
-def approach(component_ref):
+def approach():
+    component_ref = "Approach"
+    print(component_ref)
     rois.bind_any(component_ref)
 
     rois.execute("start")
@@ -266,7 +298,9 @@ def approach(component_ref):
     rois.release(component_ref)
     return result
 
-def leave(component_ref):
+def leave():
+    component_ref = "Leave"
+    print(component_ref)
     rois.bind_any(component_ref)
 
     rois.execute("start")
@@ -274,7 +308,10 @@ def leave(component_ref):
     rois.release(component_ref)
     return result
 
-def touch(component_ref):
+
+def touch():
+    component_ref = "Touch"
+    print(component_ref)
     rois.bind_any(component_ref)
 
     rois.execute("start")
@@ -296,35 +333,36 @@ def main_action():
 
 
 def main():
+
     rois.connect("connect")
 
     speech_bind("Speech_Synthesis")
     speech_bind("Speech_Recognition")
 
-    # print(person_detect("Person_Detection"))
+    print(person_detect())
     rospy.sleep(1)
 
-    speech("Speech_Synthesis" ,"hello")
+    speech("hello")
     # print("recognition greeting")
-    response = recognize_response("Speech_Recognition" ,"japanese")
+    response = recognize_response("japanese")
     print(response)
     
-    person_id = patient_identify("Person_Identification")
+    person_id = patient_identify()
     print(person_id)
 
     rospy.sleep(2)
 
-    print(person_localize("Person_Localization"))
+    print(person_localize())
     # rospy.sleep(1)
 
-    move_forward("Move", [[300, 0, 0],[0,0]])   
+    move_forward( [[300, 0, 0],[0,0]])   
     rospy.sleep(3)
 
     if person_id == "Person4":
       # speech("Speech_Synthesis" ,"measure1")
-      speech("Speech_Synthesis" ,"measure3")
+      speech("measure3")
     elif person_id == "Person3":
-      speech("Speech_Synthesis" ,"measure2")
+      speech("measure2")
 
     # print("recognition responce")
     # response = recognize_response("Speech_Recognition" ,"japanese")
@@ -332,62 +370,38 @@ def main():
     rospy.sleep(5)
     
 
-    speech("Speech_Synthesis" ,"yorosiku")
+    speech("yorosiku")
     
     rospy.sleep(3)
     
-    approach("Approach")
+    approach()
 
     rospy.sleep(3)
 
-    speech("Speech_Synthesis" ,"check")
+    speech("check")
 
     rospy.sleep(5)
 
-    touch("Touch")
+    touch()
     
     rospy.sleep(4)
     
-    speech("Speech_Synthesis" ,"thank")
+    speech("thank")
 
     rospy.sleep(3)
 
-    leave("Leave")
+    leave()
     rospy.sleep(3)
 
-    speech("Speech_Synthesis" ,"ask1")
+    speech("ask1")
     rospy.sleep(0.5)
-    response = recognize_response("Speech_Recognition" ,"japanese")
+    response = recognize_response("japanese")
     print(response)
 
     voice = judgement(response)
+    print(voice)
   
-    speech("Speech_Synthesis" ,voice)
-
-  
-def main2():
-    rois.connect("connect")
-
-    print(person_detect("Person_Detection"))
-    print(person_localize("Person_Localization"))
-
-    speech("Speech_Synthesis" ,"hello")
-
-
-def main3():
-    rois.connect("connect")
-
-    move_forward("Move", [[300, 0, 0],[0,0]])   
-
-    # speech("Speech_Synthesis" ,"measure3")
-    # person_id = patient_identify("Person_Identification")
-    # print(person_id)    
-
-
-
-def main4():
-    response = recognize_response("Speech_Recognition" ,"japanese")
-    print(response)
+    speech(voice)
 
 
 def scenario(scenario):
@@ -406,45 +420,46 @@ def scenario(scenario):
         task_arg = task.get('arg', '')
         task_list.append((task_name, task_arg))
 
-        if task_name == "Person_Detection":
-          print(person_detect("Person_Detection"))
-          rospy.sleep(1)
-        elif task_name == "Speech_Synthesis":
-          speech("Speech_Synthesis" ,task_arg)
 
-        elif task_name == "Speech_Recognition" :
-          response = recognize_response("Speech_Recognition" ,task_arg)
-          print(response)
+        if task_name == "Speech_Synthesis":
+          speech(task_arg)
+
           rospy.sleep(2)
 
 
+        elif task_name == "Move":
+          move_forward(task_arg)   
+          rospy.sleep(3)
+
+
+        elif task_name == "Person_Detection":
+          person_detect()
+        
+        elif task_name == "Speech_Recognition":
+          response = recognize_response(task_arg)
+          print(f"reconized word :{response}")
+
         elif task_name == "Person_Identification":
-          person_id = patient_identify("Person_Identification")
+          person_id = patient_identify()
           print(person_id)
 
         elif task_name == "Person_Localization":
-          person_localize("Person_Localization")
-
-        elif task_name == "Move":
-          move_forward("Move", task_arg)   
-          rospy.sleep(3)
+          person_localize()
 
         elif task_name == "Approach":
-          approach("Approach")
+          approach()
           rospy.sleep(3)
 
         elif task_name == "Touch":
-          touch("Touch")
-          rospy.sleep(3)
-
+          touch()
+          rospy.sleep(4)
 
         elif task_name == "Leave":
-          leave("Leave")
-          rospy.sleep(3)
+          leave()
+          rospy.sleep(4)
 
 
-
-
+ 
     print(task_list)
 
     # # 機能名と引数を抽出
@@ -464,7 +479,7 @@ if __name__ == '__main__':
     print(user_input)
     if user_input == "A":
       # scenario_file = input("シナリオ名を入力してください: ")
-      scenario_ = os.environ['HOME'] + "/system/scenario.yml" 
+      scenario_ = os.environ['HOME'] + "/RTSI_FW/scenario.yml" 
       scenario(scenario_)
 
     elif user_input == "B":

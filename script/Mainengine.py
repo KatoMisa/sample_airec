@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import rospy
+import os
 import tf
+import yaml
 import subprocess
 from rois_ros.srv import *
 import actionlib
@@ -20,15 +22,19 @@ class EngineService:
         
         #EngineとApp.が通信できるかどうかを決める変数
         self.ENGINE_RECEIVABLE = False
+
+        self.robotname =  '/'+ self.get_robotfile()["Robot"]
+        print(f"Robot name: {self.robotname}")
+
         
         # サービスサーバーを作成
-        self.con = rospy.Service('/connect', system_interface, self.connect)
+        self.con = rospy.Service( '/connect', system_interface, self.connect)
         self.discon = rospy.Service('/disconnect', system_interface, self.disconnect)
         self.bind = rospy.Service('/bind_any', bind_any, self.bind_any)
         self.release = rospy.Service('/release', release, self.release)
         self.service = rospy.Service('/execute', execute, self.execute_cb)
         self.subservice = rospy.Service('/subscribe', subscribe_, self.subscribe_cb)
-        self.unsubservice = rospy.Service('/unsubscribe', unsubscribe_, self.unsubscribe_cb)
+        self.unsubservice = rospy.Service( '/unsubscribe', unsubscribe_, self.unsubscribe_cb)
 
         self.eventdetailservice1 = rospy.Service('/recognized_event_detail', get_event_detail_speech_recognized, self.event_recognized_cb)
         self.eventdetailservice2 = rospy.Service('/detected_event_detail', get_event_detail_person_detected, self.event_detected_cb)
@@ -36,10 +42,8 @@ class EngineService:
         self.eventdetailservice4 = rospy.Service('/identified_event_detail', get_event_detail_person_identified, self.event_identified_cb)
 
 
-        self.completed_sub = rospy.Subscriber('/completed_command', completed, self.completed)
+        self.completed_sub = rospy.Subscriber( self.robotname + '/completed_command', completed, self.completed)
         self.completed_pub = rospy.Publisher('/completed', completed, queue_size = 1)
-        self.completed_pub1 = rospy.Publisher('/completed/speech', completed, queue_size = 1)
-        self.completed_pub2 = rospy.Publisher('/completed/move', completed, queue_size = 1)
         
         self.get_command_result = rospy.Service('/get_command_result', get_command_result, self.get_command_result_cb)
         
@@ -60,22 +64,30 @@ class EngineService:
         #　コンポーネントをbindしているかの変数
         self.BINDCOMP = None
 
-        # Navigationの目標値を格納する変数と初期目標値
-        self.position = [0.0,0.0,0.0,0.0,0.0,0.0,1.0]
-
-        # 話す言葉を格納する変数と初期値
-        self.text = ""
-
         rospy.loginfo("Engine Service is ready.")
 
         self.bindspeech = 0
         self.bindrecognition = 0
 
+    def get_robotfile(self):
+        # 現在のスクリプトの絶対パスを取得
+        current_file_path = os.path.abspath(__file__)
+
+        package_relative_path = current_file_path.split('/src/')[1]
+        catkin_path = current_file_path.split('/src/')[0]
+        package_name = package_relative_path.split('/')[0]
+
+        path = catkin_path +'/src/'+ package_name +"/robot.yaml"
+        
+        with open(path, 'r') as file:
+            data = yaml.safe_load(file)
+
+        return data
+
 
     #System_Interfaceのconnect()
     #ENGINE_RECEIVABLEがTrueになるとメッセージのやり取りが可能になる
     def connect(self, si_req):
-        print("system_interface")
         if si_req.connect == "connect":
 
             self.ENGINE_RECEIVABLE = True  
@@ -124,9 +136,8 @@ class EngineService:
     def bind_any(self,b_req):
         
         #エンジンにつながっているHRI-Cの一覧
-        # self.component_ref_list = ["testcomp7_1","testcomp6_1"] 
-        # self.component_ref_list = ["Speech_Synthesis","Navigation"]
-        self.component_ref_list = ["Speech_Synthesis","Navigation","Speech_Recognition","Person_Detection", "Move", "Person_Localization","Person_Identification","Touch","Approach","Leave"]
+        self.component_ref_list = self.get_robotfile()["Component"]
+        print(self.component_ref_list)
 
         #ENGINE_RECEIVABLEがTrueの場合
         if self.ENGINE_RECEIVABLE:
@@ -135,12 +146,9 @@ class EngineService:
             
             if self.BINDCOMP == None:
             #重複防止のためにサービス名を作成
-                # get_name = '/get_parameter_' + self.component_ref  
-                # set_name = '/set_parameter_' + self.component_ref
-                # exe_name = '/execute_' + self.component_ref
-                get_name = '/get_parameter/' + self.component_ref  
-                set_name = '/set_parameter/' + self.component_ref
-                exe_name = '/execute/' + self.component_ref
+                get_name =  '/get_parameter/' + self.component_ref  
+                set_name =  '/set_parameter/' + self.component_ref
+                exe_name = self.robotname + '/execute/' + self.component_ref
 
                 try:
                     #リクエストされたコンポーネント名がcomponent_ref_listにある場合に実行
@@ -165,8 +173,6 @@ class EngineService:
                                     rospy.loginfo(f"{set_name} Service is ready.")
 
                                 
-                                self.set_text = rospy.ServiceProxy('/speech_set_param', speech_set_param)
-                                rospy.loginfo(f'action client "speech_set_param" start...')
 
                             self.client = actionlib.SimpleActionClient(exe_name, executeAction)
                             self.client.wait_for_server()
@@ -366,9 +372,9 @@ class EngineService:
     def release(self,re_req):
         print("Release")
         try:
-            # self.get_parameter = None
-            # self.set_parameter = None 
-            # self.client = None
+            self.get_parameter = None
+            self.set_parameter = None 
+            self.client = None
 
             self.BINDCOMP = None
             return releaseResponse("OK")
@@ -389,7 +395,7 @@ class EngineService:
             self.text = s_req.speech_text
         
             try:
-                # self.set_text = rospy.ServiceProxy('/speech_set_param', speech_set_param)
+                self.set_text = rospy.ServiceProxy( self.robotname + '/speech_set_param', speech_set_param)
                 s_result = self.set_text(self.text)
                 print(s_result)
 
@@ -414,7 +420,7 @@ class EngineService:
         print("get_parameter")
         if self.ENGINE_RECEIVABLE:
             try:
-                self.get_text = rospy.ServiceProxy('/speech_get_param', speech_get_param)
+                self.get_text = rospy.ServiceProxy(self.robotname + '/speech_get_param', speech_get_param)
                                 
                 g_text = self.get_text()
                 self.text = g_text.speech_text
@@ -441,7 +447,7 @@ class EngineService:
             self.language = s_req.languages
         
             try:
-                self.set_language = rospy.ServiceProxy('/s_recognition_set_param', s_recognition_set_param)
+                self.set_language = rospy.ServiceProxy(self.robotname + '/s_recognition_set_param', s_recognition_set_param)
                 s_result = self.set_language(self.text)
                 print(s_result)
 
@@ -468,7 +474,7 @@ class EngineService:
             print(f"Get parameter {self.BINDCOMP}")
             try: 
                 # Navigation Componentからパラメータを取得するサービスのリクエスト
-                self.get_language = rospy.ServiceProxy('/s_recognition_get_param', s_recognition_get_param)
+                self.get_language = rospy.ServiceProxy(self.robotname +'/s_recognition_get_param', s_recognition_get_param)
                 g_language = self.get_language()
 
                 #目標値を格納
@@ -505,7 +511,7 @@ class EngineService:
             print(self.line)
         
             try:
-                self.set_distance = rospy.ServiceProxy('/move_set_param', move_set_param)
+                self.set_distance = rospy.ServiceProxy(self.robotname +'/move_set_param', move_set_param)
                 s_result = self.set_distance(self.line, self.curve)
                 print(1)
 
@@ -534,7 +540,7 @@ class EngineService:
         print("get_parameter")
         if self.ENGINE_RECEIVABLE:
             try:
-                self.get_distance = rospy.ServiceProxy('/move_get_param', move_get_param)
+                self.get_distance = rospy.ServiceProxy(self.robotname +'/move_get_param', move_get_param)
                 g_distance = self.get_distance()
                 self.line  = g_distance.line
                 print(self.line )
@@ -561,10 +567,7 @@ class EngineService:
     #Component_statusを取得するようの関数
     def component_status(self, co_name):
         try:
-            # state_name = '/get_state_' + self.component_ref
-            # get_component_status = rospy.ServiceProxy(state_name, component_status)
-            # return get_component_status(co_name)
-            state_name = '/get_state/' + self.component_ref
+            state_name = self.robotname + '/get_state/' + self.component_ref
             get_component_status = rospy.ServiceProxy(state_name, component_status)
             return get_component_status(co_name)
         except rospy.ServiceException as e:
@@ -599,12 +602,12 @@ class EngineService:
         if result.event_type == "speech_recognized":
             print(result.event_type)
             current_timestamp = result.timestamp
-            # print(f'current {current_timestamp}')
+            
             if current_timestamp == self.last_timestamp:
                 return
             _list = [result.event_type, result.timestamp, result.recognized_text]
             self.last_timestamp = current_timestamp
-            # print(f'{self.last_timestamp}')
+            
 
         self.event_count += 1
         self.event_id = "speech_recognition" + str(self.event_count)
@@ -681,40 +684,6 @@ class EngineService:
         print("pub event_id")
         self.notify_event_pub.publish(notify_event_pub)
 
-    # def notify_event(self,event_id, event_type, subscribe_id):
-        #     print(2)
-        #     rospy.loginfo(f'event_id:{event_id}, event_type:{event_type}, subscribe_id:{subscribe_id}')
-        #     if "recogn" in event_id:
-        #         notify_event_pub1 = notifyevent()
-        #         notify_event_pub1.event_id = event_id
-        #         notify_event_pub1.event_type = event_type
-        #         notify_event_pub1.subscribe_id = subscribe_id
-        #         print("pub event_id")
-        #         self.notify_event_pub1.publish(notify_event_pub1)
-
-        #     elif "detec" in event_id:
-        #         notify_event_pub2 = notifyevent()
-        #         notify_event_pub2.event_id = event_id
-        #         notify_event_pub2.event_type = event_type
-        #         notify_event_pub2.subscribe_id = subscribe_id
-        #         print("pub event_id")
-        #         self.notify_event_pub2.publish(notify_event_pub2)
-                
-
-        #     elif "local" in event_id:
-        #         notify_event_pub3 = notifyevent()
-        #         notify_event_pub3.event_id = event_id
-        #         notify_event_pub3.event_type = event_type
-        #         notify_event_pub3.subscribe_id = subscribe_id
-        #         self.notify_event_pub3.publish(notify_event_pub3)
-
-
-        #     elif "ident" in event_id:
-        #         notify_event_pub4 = notifyevent()
-        #         notify_event_pub4.event_id = event_id
-        #         notify_event_pub4.event_type = event_type
-        #         notify_event_pub4.subscribe_id = subscribe_id
-        #         self.notify_event_pub4.publish(notify_event_pub4)
 
     def event_recognized_cb(self,req):
 
@@ -818,7 +787,6 @@ class EngineService:
 
 
     def subscribe_cb(self, sub_req):
-        # self.component_ref = "Speech_Recognition"
         self.subcount += 1
         self.component_ref = self.BINDCOMP
         print(self.component_ref)
@@ -828,21 +796,18 @@ class EngineService:
         
         
         #アプリに送信するためのトピック通信(notify_event())
-        self.notify_event_pub = rospy.Publisher('/notify_event', notifyevent,queue_size = 1)
-        self.notify_event_pub1 = rospy.Publisher('/notify_event_pub/recog', notifyevent,queue_size = 1)
-        self.notify_event_pub2 = rospy.Publisher('/notify_event_pub/detec', notifyevent,queue_size = 1)
-        self.notify_event_pub3 = rospy.Publisher('/notify_event_pub/local', notifyevent,queue_size = 1)
-        self.notify_event_pub4 = rospy.Publisher('/notify_event_pub/inden', notifyevent,queue_size = 1)
+        self.notify_event_pub  = rospy.Publisher( '/notify_event', notifyevent,queue_size = 1)
+        self.notify_event_pub1 = rospy.Publisher( '/notify_event_pub/recog', notifyevent,queue_size = 1)
+        self.notify_event_pub2 = rospy.Publisher( '/notify_event_pub/detec', notifyevent,queue_size = 1)
+        self.notify_event_pub3 = rospy.Publisher( '/notify_event_pub/local', notifyevent,queue_size = 1)
+        self.notify_event_pub4 = rospy.Publisher( '/notify_event_pub/inden', notifyevent,queue_size = 1)
 
-        #コンポーネントとやり取りするためのサービス通信
-        # sub_ = '/Subscribe/' + self.component_ref
-        # _subscribe = rospy.ServiceProxy(sub_, subscribe_set)
 
         #コンポーネントからの結果を受信するためのトピック通信
-        self.event_subscriber1 = rospy.Subscriber('/event_speechrec', notify_speechrec3,self.event_cb1)
-        self.event_subscriber2 = rospy.Subscriber('/event_persondetec', notify_persondetect,self.event_cb2)
-        self.event_subscriber3 = rospy.Subscriber('/event_localization', notify_localrec,self.event_cb3)
-        self.event_subscriber4 = rospy.Subscriber('/event_identified', notify_identified,self.event_cb4)
+        self.event_subscriber1 = rospy.Subscriber( self.robotname + '/event_speechrec', notify_speechrec3,self.event_cb1)
+        self.event_subscriber2 = rospy.Subscriber( self.robotname + '/event_persondetec', notify_persondetect,self.event_cb2)
+        self.event_subscriber3 = rospy.Subscriber( self.robotname + '/event_localization', notify_localrec,self.event_cb3)
+        self.event_subscriber4 = rospy.Subscriber( self.robotname + '/event_identified', notify_identified,self.event_cb4)
         
 
         # print(sub_req)
@@ -860,12 +825,6 @@ class EngineService:
 
         try:
             print(f"unsubscribe: {unsub_req}")
-
-            #結果を格納する
-            # self.speech_recognition_list  = []
-            # self.person_detected_list = []
-            # self.person_position_list = []
-            # self.person_identi_list = []
 
             #topicの購読をやめる
             self.event_subscriber1.unregister()
@@ -899,7 +858,6 @@ class EngineService:
         try:
 
             if self.command == "start":
-                # self.component_ref = "Speech_Synthesis"
                 self.component_ref = self.BINDCOMP
                 print(self.component_ref)
                 #コンポーネントの状態をとるサービス通信
@@ -997,7 +955,6 @@ class EngineService:
 
 
     def action_done_callback(self, cb_status, cb_result):# アクションが完了したら呼び出される
-        # rospy.loginfo(f'Action completed with result: {result.return_t}')
         if cb_status == actionlib.GoalStatus.SUCCEEDED:
             rospy.loginfo(f"Action succeeded with result: {cb_result.success}")
         else:
@@ -1009,36 +966,23 @@ class EngineService:
         command_id = c_req.command_id + str(self.command_count)
         status = c_req.status
         rospy.loginfo(f"command_id {command_id} is {status}")
+
         
-        completed_Pub = completed()
-        completed_Pub.command_id = command_id
-        completed_Pub.status = status
-        self.completed_pub.publish(completed_Pub)
+        _list = [command_id, status]
+        
 
-        # if "Speech" in command_id:
-        #     self.completed_Pub1 = completed()
-
-        #     if self.add_item(self.command_list, [command_id,status]):
-        #         print("publish command_id")
-        #         self.completed_Pub1.command_id = command_id
-        #         self.completed_Pub1.status = status
-        #         self.completed_pub1.publish(self.completed_Pub1)
-
-        # elif "Move" in command_id:
-        #     self.completed_Pub2 = completed()
-
-        #     if self.add_item(self.command_list, [command_id,status]):
-        #         print("publish command_id")
-        #         self.completed_Pub2.command_id = command_id
-        #         self.completed_Pub2.status = status
-        #         self.completed_pub2.publish(self.completed_Pub2)
+        if self.add_item(self.command_list , _list):
+            completed_Pub = completed()
+            completed_Pub.command_id = command_id
+            completed_Pub.status = status
+            self.completed_pub.publish(completed_Pub)
 
 
-    
     def get_command_result_cb(self,req):
         print("get_command_result")
 
         data_list = self.command_list
+        print(data_list)
 
         search_command_id = req.command_id
 
@@ -1054,11 +998,8 @@ class EngineService:
             return get_command_resultResponse("")
 
 
-
-
 if __name__ == "__main__":
     rospy.init_node('Engine_sample')
-    print("time")
     try:
         _service = EngineService()
         rospy.spin()

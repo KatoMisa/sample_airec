@@ -3,6 +3,7 @@
 import rospy
 import os
 import subprocess
+import yaml
 import rosparam
 from std_msgs.msg import String, Int32MultiArray
 import pygame
@@ -27,8 +28,11 @@ class Speech_RecognitionService():
         #コンポーネント名を設定する
         self.comp_ref = "Speech_Recognition"
 
+        self.robotname = '/' + self.get_robotfile()["Robot"]
+        print(f"Robot name: {self.robotname}")
+
         #コンポーネントの状態確認のサービス設定
-        state_name = '/get_state/' + self.comp_ref
+        state_name = self.robotname + '/get_state/' + self.comp_ref
         self.state_service = rospy.Service(state_name, component_status, self.component_status)
 
 
@@ -39,19 +43,15 @@ class Speech_RecognitionService():
         self.retry_sound = self.directory +"retry.mp3"
 
         #Command用のアクション通信の設定
-        exe_name = '/execute/' + self.comp_ref
+        exe_name = self.robotname + '/execute/' + self.comp_ref
         self.server = actionlib.SimpleActionServer(exe_name, executeAction, self.execute, False)
         self.server.start()
         rospy.loginfo(f"{exe_name} Service is ready.")
         
-        # #Event用のサービス通信の設定
-        # exe_name = '/Subscribe/' + self.comp_ref
-        # self.sub_server = rospy.Service(exe_name, subscribe_set, self.subs)
-        # rospy.loginfo(f"{exe_name} Service is ready.")
 
         #パラメータ操作用のサービス通信の設定
-        self.set = rospy.Service('/s_recognition_set_param', s_recognition_set_param, self.set_parameter)  
-        self.get = rospy.Service('/s_recognition_get_param', s_recognition_get_param, self.get_parameter)
+        self.set = rospy.Service(self.robotname + '/s_recognition_set_param', s_recognition_set_param, self.set_parameter)  
+        self.get = rospy.Service(self.robotname + '/s_recognition_get_param', s_recognition_get_param, self.get_parameter)
 
         #パラメータの初期値
         self.recognizable_list = ["japanese"]  #認識可能な言語
@@ -72,7 +72,7 @@ class Speech_RecognitionService():
 
         #イベント通知するためのトピック通信の設定
         # self.pub = rospy.Publisher('/event_speechrec', notify_speechrec , queue_size=1)
-        self.pub = rospy.Publisher('/event_speechrec', notify_speechrec3 , queue_size=1)
+        self.pub = rospy.Publisher(self.robotname +'/event_speechrec', notify_speechrec3 , queue_size=1)
 
         #コマンド終了の通知用のトピックの設定
         self.pub1 = rospy.Publisher('/completed_event', completed , queue_size=1)
@@ -91,6 +91,20 @@ class Speech_RecognitionService():
         rospy.loginfo(f'Componemt status: {self.comp_state}')  #コンポーネントをREADY状態にする
 
 
+    def get_robotfile(self):
+        # 現在のスクリプトの絶対パスを取得
+        current_file_path = os.path.abspath(__file__)
+
+        package_relative_path = current_file_path.split('/src/')[1]
+        catkin_path = current_file_path.split('/src/')[0]
+        package_name = package_relative_path.split('/')[0]
+
+        path = catkin_path +'/src/'+ package_name +"/robot.yaml"
+        
+        with open(path, 'r') as file:
+            data = yaml.safe_load(file)
+
+        return data
 
     #オプション関数(リスト更新用)
     def add_lang_item(self, _list, item):
@@ -314,6 +328,5 @@ class Speech_RecognitionService():
 
 if __name__ == "__main__":
     rospy.init_node('Speech_Recognition')
-    print("time")
     service = Speech_RecognitionService()
     service.run()

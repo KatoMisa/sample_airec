@@ -1,4 +1,4 @@
-<rois:HRIEngineProfile xmlns:rois="http://example.com/rois" xmlns:gml="http://example.com/gml">
+<rois:HRIEngineProfile xmlns:rois="http://example.com/r/rois" xmlns:gml="http://example.com/r/gml">
     <gml:identifier>urn:x-rois:def:HRIEngine:sample_airec</gml:identifier>
     <gml:filename>Mainengine</gml:filename>
     <rois:HRIComponent>rois:HRIComponent:PersonDetection</rois:HRIComponent>

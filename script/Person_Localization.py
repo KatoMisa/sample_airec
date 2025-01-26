@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import rospy
 import os
+import yaml
 import subprocess
 import rosparam
 from std_msgs.msg import String
@@ -25,25 +26,25 @@ class Person_LocalizationService():
         #コンポーネント名を設定する
         self.comp_ref = "Person_Localization"
 
+        self.robotname =  '/'+ self.get_robotfile()["Robot"]
+        print(f"Robot name: {self.robotname}")
+        
         #コンポーネントの状態確認のサービス設定
-        state_name = '/get_state/' + self.comp_ref
+        state_name = self.robotname + '/get_state/' + self.comp_ref
         self.state_service = rospy.Service(state_name, component_status, self.component_status)
 
 
 
         #Command用のアクション通信の設定
-        exe_name = '/execute/' + self.comp_ref
+        exe_name = self.robotname + '/execute/' + self.comp_ref
         self.server = actionlib.SimpleActionServer(exe_name, executeAction, self.execute, False)
         self.server.start()
         rospy.loginfo(f"{exe_name} Service is ready.")
         
-        #Event用のサービス通信の設定
-        exe_name = '/Subscribe/' + self.comp_ref
-        self.sub_server = rospy.Service(exe_name, subscribe_set, self.subs)
-        rospy.loginfo(f"{exe_name} Service is ready.")
 
         # #パラメータ操作用のサービス通信の設定
         self.localized_human = rospy.ServiceProxy('/get_position', GetPosition)
+        rospy.wait_for_service('/get_position')
 
         #Thread用の設定
         self.state = "idle"
@@ -53,10 +54,10 @@ class Person_LocalizationService():
 
 
         #イベント通知するためのトピック通信の設定
-        self.pub = rospy.Publisher('/event_localization', notify_localrec , queue_size=1)
+        self.pub = rospy.Publisher(self.robotname + '/event_localization', notify_localrec , queue_size=1)
 
         #コマンド終了の通知用のトピックの設定
-        self.pub1 = rospy.Publisher('/completed_event', completed , queue_size=1)
+        self.pub1 = rospy.Publisher(self.robotname + '/completed_event', completed , queue_size=1)
 
         #イベント通知のトピックを送信するか判断する変数の設定
         self.SEND_DETECT = False         #person_detectedメソッド用
@@ -65,7 +66,20 @@ class Person_LocalizationService():
         self.comp_state = "READY"
         rospy.loginfo(f'Componemt status: {self.comp_state}')  #コンポーネントをREADY状態にする
 
+    def get_robotfile(self):
+        # 現在のスクリプトの絶対パスを取得
+        current_file_path = os.path.abspath(__file__)
 
+        package_relative_path = current_file_path.split('/src/')[1]
+        catkin_path = current_file_path.split('/src/')[0]
+        package_name = package_relative_path.split('/')[0]
+
+        path = catkin_path +'/src/'+ package_name +"/robot.yaml"
+        
+        with open(path, 'r') as file:
+            data = yaml.safe_load(file)
+
+        return data
 
 
     #コンポーネントが持つパラメータを設定するためのset_parameter()
@@ -221,6 +235,5 @@ class Person_LocalizationService():
 
 if __name__ == "__main__":
     rospy.init_node('Person_Localization')
-    print("time")
     service = Person_LocalizationService()
     service.run()

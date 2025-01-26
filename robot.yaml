@@ -1,0 +1,18 @@
+Robot: AIREC
+Component:
+  - Person_Detection
+  - Person_Localization
+  - Person_Identification
+  - Speech_Synthesis
+  - Speech_Recognition
+  - Move
+  - Approach
+  - Touch
+  - Leave
+
+Param:
+  Move:
+    odom: /torobo/base_controller/odom
+    vel: /torobo/base_controller/cmd_vel
+  Person_Identification:
+    image: /torobo/head/see3cam_left/camera/color/image_raw
