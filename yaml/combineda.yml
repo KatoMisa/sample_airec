@@ -1,14 +1,6 @@
 collect:
   rtm: []
-  apt:
-  - ros-noetic-moveit
-  - ros-noetic-cv-bridge
-  pip:
-  - PyYAML
-  - psycopg2
-  - pygame
-  - SpeechRecognition
-  - opencv-python
-  - face_recognition
+  apt: []
+  pip: []
   git: []
   other: []
